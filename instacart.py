@@ -4,6 +4,7 @@ Created on Wed Dec  9 16:43:14 2020
 
 @author: Pedro
 """
+#1) Import data
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,7 +17,7 @@ orders = pd.read_csv('orders.csv')
 products = pd.read_csv('products.csv')
 sample_submission = pd.read_csv('sample_submission.csv')
 
-#1) Data exploration
+#2) Data exploration
 orders.columns #seems to be good for exploring the time in which purchases were made
 orders.dtypes
 #Day of the week
@@ -44,24 +45,21 @@ compare_days = {'Saturday':'Weekends', 'Sunday':'Weekends',
 orders['order_dow'] = (orders['order_dow'].map(compare_days))
 orders['order_hour_of_day'].hist(by=orders['order_dow']) #roughly the same distribution
 
-order1 = order_products_train.set_index('product_id')
-order2 = products.set_index('product_id')
-order3 = order1.merge(order2, how='inner')
+order1 = order_products_train.merge(products, how='inner')
+order1 = order1.sort_values(by=['order_id','add_to_cart_order'])
 
-order3['product_name'].value_counts().head(10).plot(
+order1['product_name'].value_counts().head(10).plot(
     kind='barh', figsize=(20,10), fontsize=12)
 plt.title('Most sold products', fontsize = 20)
 plt.ylabel('Product')
 plt.xlabel('Number')
 plt.show()
 
-#2) Data preparation
-#Already cleaned, but we will modify it to our purposes
-#Know what was bought in each order, in which order it was added to the cart
-order3 = order3.sort_values(by=['order_id','add_to_cart_order'])
+order1['add_to_cart_order'].count().plot(kind="bar")
+
 order4 = order3.groupby('order_id')['product_name'].agg(', '.join).reset_index()
 
-#3) Apriori algorithm
+#4) Apriori algorithm
 from mlxtend.frequent_patterns import association_rules, apriori
 from mlxtend.preprocessing import TransactionEncoder
 
@@ -75,7 +73,7 @@ onehot = encoder.transform(one_product)
 # convert one-hot encode data to DataFrame
 onehot = pd.DataFrame(onehot, columns=encoder.columns_)
 # compute frequent items using the Apriori algorithm - Get up to three items
-frequent_itemsets = apriori(onehot, min_support=0.001, max_len=3, use_colnames=True)
+frequent_itemsets = apriori(onehot, min_support=0.5, max_len=3, use_colnames=True)
 
 # compute all association rules for frequent_itemsets
 rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
