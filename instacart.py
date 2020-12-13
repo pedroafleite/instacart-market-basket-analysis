@@ -31,6 +31,15 @@ orders['order_dow'] = orders['order_dow'].map(days)
 
 orders.groupby('order_dow')['order_id'].count().plot(kind="bar")
 
+#Reorder days of the week as shown in plot
+dow = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 
+                    'Friday', 'Saturday', 'Sunday']
+mapping = {order_dow: i for i, order_dow in enumerate(dow)}
+key = orders['order_dow'].map(mapping)
+orders = orders.iloc[key.argsort()]
+
+orders.groupby('order_dow', sort=False)['order_id'].count().plot(kind="bar")
+
 #Hour of the day
 orders.groupby('order_hour_of_day')['order_id'].count().plot(kind="bar")
 
@@ -57,14 +66,14 @@ plt.show()
 
 order1['add_to_cart_order'].count().plot(kind="bar")
 
-order4 = order3.groupby('order_id')['product_name'].agg(', '.join).reset_index()
+order2 = order1.groupby('order_id')['product_name'].agg(', '.join).reset_index()
 
 #4) Apriori algorithm
 from mlxtend.frequent_patterns import association_rules, apriori
 from mlxtend.preprocessing import TransactionEncoder
 
 # get all shopping lists as one list
-one_product = list(order4['product_name'].apply(lambda x: sorted(x.split(','))))
+one_product = list(order2['product_name'].apply(lambda x: sorted(x.split(','))))
 
 # instantiate transcation encoder
 encoder = TransactionEncoder().fit(one_product)
@@ -73,7 +82,8 @@ onehot = encoder.transform(one_product)
 # convert one-hot encode data to DataFrame
 onehot = pd.DataFrame(onehot, columns=encoder.columns_)
 # compute frequent items using the Apriori algorithm - Get up to three items
-frequent_itemsets = apriori(onehot, min_support=0.5, max_len=3, use_colnames=True)
+frequent_itemsets = apriori(onehot, min_support=.006, max_len=3, use_colnames=True)
+frequent_itemsets.to_csv('frequent_itemsets.csv', index=False)
 
 # compute all association rules for frequent_itemsets
 rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
@@ -81,3 +91,24 @@ rules = association_rules(frequent_itemsets, metric="lift", min_threshold=1)
 # given that the left-hand side has two items, then which item is more likely to be added to the basket?
 rules['lhs items'] = rules['antecedents'].apply(lambda x:len(x) )
 rules[rules['lhs items']>1].sort_values('lift', ascending=False).head()
+rules.to_csv('rules.csv', index=False)
+
+#Data visualization
+import seaborn as sns
+# Replace frozen sets with strings
+rules['antecedents_'] = rules['antecedents'].apply(lambda a: ','.join(list(a)))
+rules['consequents_'] = rules['consequents'].apply(lambda a: ','.join(list(a)))
+# Transform the DataFrame of rules into a matrix using the lift metric
+pivot = rules[rules['lhs items']>=1].pivot(
+    index='antecedents_', columns='consequents_', values= 'lift')
+# Generate a heatmap with annotations on and the colorbar off
+fig, ax = plt.subplots(figsize=(8,7))  
+m = sns.heatmap(pivot, annot=True, linewidths=.1, annot_kws={"size":10}, ax=ax)
+plt.ylabel('Antecedents')
+plt.xlabel('Consequents')
+plt.yticks(rotation=0)
+plt.xticks(rotation=90)
+plt.show()
+
+n = m.get_figure()
+n.savefig('heatmap.png', bbox_inches='tight')
