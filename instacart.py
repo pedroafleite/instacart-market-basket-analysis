@@ -38,21 +38,52 @@ mapping = {order_dow: i for i, order_dow in enumerate(dow)}
 key = orders['order_dow'].map(mapping)
 orders = orders.iloc[key.argsort()]
 
-orders.groupby('order_dow', sort=False)['order_id'].count().plot(kind="bar")
+m1 = orders.groupby('order_dow', sort=False)['order_id'].count().plot(kind="bar")
+plt.ylabel('Quantity of orders')
+plt.xlabel('')
+plt.yticks(rotation=0)
+plt.xticks(rotation=20)
+plt.show()
+
+n1 = m1.get_figure()
+n1.savefig('week_days.png', bbox_inches='tight')
 
 #Hour of the day
-orders.groupby('order_hour_of_day')['order_id'].count().plot(kind="bar")
+m2 = orders.groupby('order_hour_of_day')['order_id'].count().plot(kind="bar")
+plt.ylabel('Quantity of orders')
+plt.xlabel('Hour of the day')
+plt.yticks(rotation=0)
+plt.xticks(rotation=0)
+plt.show()
+
+n2 = m2.get_figure()
+n2.savefig('hour_of_the_day.png', bbox_inches='tight')
 
 #Days since prior order
-orders.groupby('days_since_prior_order')['order_id'].count().plot(kind="bar")
+m3 = orders.groupby('days_since_prior_order')['order_id'].count().plot(kind="bar")
+plt.ylabel('Quantity of orders')
+plt.xlabel('Days since prior order')
+plt.yticks(rotation=0)
+plt.xticks(rotation=90)
+plt.show()
+
+n3 = m3.get_figure()
+n3.savefig('days_since_prior_order.png', bbox_inches='tight')
 
 #Compare hour of the day by each day of the week to check for overlaps
+orders = pd.read_csv('orders.csv') #reload csv
+days = {0:'Saturday', 1:'Sunday', 2:'Monday', 3:'Tuesday', 
+        4:'Wednesday', 5:'Thursday', 6:'Friday'}
+orders['order_dow'] = orders['order_dow'].map(days) 
 compare_days = {'Saturday':'Weekends', 'Sunday':'Weekends', 
                 'Monday': 'Week days', 'Tuesday':'Week days', 
                 'Wednesday':'Week days', 'Thursday':'Week days', 
                 'Friday':'Week days'}
 orders['order_dow'] = (orders['order_dow'].map(compare_days))
-orders['order_hour_of_day'].hist(by=orders['order_dow']) #roughly the same distribution
+
+m4 = orders['order_hour_of_day'].hist(by=orders['order_dow']) #roughly the same distribution
+
+#Create merge of orders and products
 
 order1 = order_products_train.merge(products, how='inner')
 order1 = order1.sort_values(by=['order_id','add_to_cart_order'])
@@ -68,7 +99,7 @@ order1['add_to_cart_order'].count().plot(kind="bar")
 
 order2 = order1.groupby('order_id')['product_name'].agg(', '.join).reset_index()
 
-#4) Apriori algorithm
+# 4) Apriori algorithm
 from mlxtend.frequent_patterns import association_rules, apriori
 from mlxtend.preprocessing import TransactionEncoder
 
@@ -93,7 +124,7 @@ rules['lhs items'] = rules['antecedents'].apply(lambda x:len(x) )
 rules[rules['lhs items']>1].sort_values('lift', ascending=False).head()
 rules.to_csv('rules.csv', index=False)
 
-#Data visualization
+# Data visualization of Market Basket Analysis
 import seaborn as sns
 # Replace frozen sets with strings
 rules['antecedents_'] = rules['antecedents'].apply(lambda a: ','.join(list(a)))
@@ -112,3 +143,8 @@ plt.show()
 
 n = m.get_figure()
 n.savefig('heatmap.png', bbox_inches='tight')
+
+# 5) Fixing Big Data processing issues
+onehot.info(verbose=False, memory_usage="deep") #memory usage: 7.0 GB!
+
+frequent_itemsets2 = apriori(onehot, min_support=.005, max_len=3, use_colnames=True)
